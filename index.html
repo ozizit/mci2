@@ -9,13 +9,456 @@
     <link rel="shortcut icon" href="favicon.ico" />
     
     <title>Trash Collector</title>
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { 
+    margin: 0; 
+    padding: 0; 
+    background-color: #ffbb00;
+}
+
+canvas { 
+    display: block; 
+    margin: 0 auto; 
+    background-color: #ffffff; 
+}
+    </style>
 </head>
 
 <body>
     <!-- page content -->
     <canvas id="canvas"></canvas>
-    </html>
 
+<script>
+
+// shim layer with setTimeout fallback
+window.requestAnimFrame = (function(){
+    return  window.requestAnimationFrame       || 
+            window.webkitRequestAnimationFrame || 
+            window.mozRequestAnimationFrame    || 
+            window.oRequestAnimationFrame      || 
+            window.msRequestAnimationFrame     || 
+            function( callback ){
+              window.setTimeout(callback, 1000 / 60);
+            };
+  })();
+  
+  // namespace the game with variable TRS and set up some initial values
+  var TRS = {
+  
+      WIDTH: 320, 
+      HEIGHT:  480, 
+      scale:  1,
+      // the position of the canvas in relation to the screen
+      offset: {top: 0, left: 0},
+      // store all bubble, touches, particles etc
+      entities: [],
+      // the amount of game ticks until we spawn a bubble
+      nextBubble: 100,
+      // for tracking player's progress
+      score: {
+          taps: 0,
+          collected: 0,
+          missed: 0, 
+          accuracy: 0
+      },
+      // we'll set the rest of these in the init function
+      RATIO:  null,
+      currentWidth:  null,
+      currentHeight:  null,
+      canvas: null,
+      ctx:  null,
+      ua:  null,
+      android: null,
+      ios:  null,
+  
+      init: function() {
+     
+          // the proportion of width to height
+          TRS.RATIO = TRS.WIDTH / TRS.HEIGHT;
+          // these will change when the screen is resize
+          TRS.currentWidth = TRS.WIDTH;
+          TRS.currentHeight = TRS.HEIGHT;
+          // our canvas element
+          TRS.canvas = document.getElementsByTagName('canvas')[0];
+          // it's important to set this otherwise the browser will default to 320x200
+          TRS.canvas.width = TRS.WIDTH;
+          TRS.canvas.height = TRS.HEIGHT;
+          // the canvas context allows us to interact with the canvas api
+          TRS.ctx = TRS.canvas.getContext('2d');
+          // we need to sniff out android & ios so we can hide the address bar in our resize function
+          TRS.ua = navigator.userAgent.toLowerCase();
+          TRS.android = TRS.ua.indexOf('android') > -1 ? true : false;
+          TRS.ios = ( TRS.ua.indexOf('iphone') > -1 || TRS.ua.indexOf('ipad') > -1  ) ? true : false;
+  
+          // set up our wave effect
+          // basically, a series of overlapping circles across the top of screen
+          TRS.wave = {
+              x: -25, // x coord of first circle
+              y: -40, // y coord of first circle
+              r: 50, // circle radius
+              time: 0, // we'll use this in calculating the sine wave
+              offset: 0 // this will be the sine wave offset
+          }; 
+          // calculate how many circles we need to cover the screen width
+          TRS.wave.total = Math.ceil(TRS.WIDTH / TRS.wave.r) + 1;
+  
+          // listen for clicks
+          window.addEventListener('click', function(e) {
+              e.preventDefault();
+              TRS.Input.set(e);
+          }, false);
+  
+          // listen for touches (TOUCH EVENTS)
+          window.addEventListener('touchstart', function(e) {
+              e.preventDefault();
+              // the event object has an array called touches
+              // we just want the first touch
+              TRS.Input.set(e.touches[0]);
+          }, false);
+          window.addEventListener('touchmove', function(e) {
+              // NEED TO ADD MORE MOVES FOR THE GAMEPLAY
+              e.preventDefault();
+          }, false);
+          window.addEventListener('touchend', function(e) {
+              // AS ABOVE
+              e.preventDefault();
+          }, false);
+  
+          // we're ready to resize
+          TRS.resize();
+  
+          TRS.loop();
+  
+      },
+  
+  
+      resize: function() {
+      
+          TRS.currentHeight = window.innerHeight;
+          // resize the width in proportion to the new height
+          TRS.currentWidth = TRS.currentHeight * TRS.RATIO;
+  
+          // this will create some extra space on the page, allowing us to scroll pass
+          // the address bar, and thus hide it.
+          if (TRS.android || TRS.ios) {
+              document.body.style.height = (window.innerHeight + 50) + 'px';
+          }
+  
+          // set the new canvas style width & height
+          // note: our canvas is still 320x480 but we're essentially scaling it with CSS
+          TRS.canvas.style.width = TRS.currentWidth + 'px';
+          TRS.canvas.style.height = TRS.currentHeight + 'px';
+  
+          // the amount by which the css resized canvas is different to the actual (480x320) size.
+          TRS.scale = TRS.currentWidth / TRS.WIDTH;
+          // position of canvas in relation to the screen
+          TRS.offset.top = TRS.canvas.offsetTop;
+          TRS.offset.left = TRS.canvas.offsetLeft;
+  
+          // we use a timeout here as some mobile browsers won't scroll if there is not a small delay
+          window.setTimeout(function() {
+                  window.scrollTo(0,1);
+          }, 1);
+      },
+  
+      // this is where all entities will be moved and checked for collisions etc
+      update: function() {
+          var i,
+              checkCollision = false; // we only need to check for a collision
+                                     // if the user tapped on this game tick
+   
+  
+          // decrease our nextBubble counter
+          TRS.nextBubble -= 1;
+          // if the counter is less than zero
+          if (TRS.nextBubble < 0) {
+              // put a new instance of bubble into our entities array
+              TRS.entities.push(new TRS.Bubble());
+              // reset the counter with a random value
+              TRS.nextBubble = ( Math.random() * 100 ) + 100;
+          }
+  
+          // spawn a new instance of Touch
+          // if the user has tapped the screen
+          if (TRS.Input.tapped) {
+              // keep track of taps; needed to calculate accuracy
+              TRS.score.taps += 1;
+              // add a new touch
+              TRS.entities.push(new TRS.Touch(TRS.Input.x, TRS.Input.y));
+              // set tapped back to false to avoid spawning a new touch in the next cycle
+              TRS.Input.tapped = false;
+              checkCollision = true;
+          }
+  
+          // cycle through all entities and update as necessary
+          for (i = 0; i < TRS.entities.length; i += 1) {
+              TRS.entities[i].update();
+  
+              if (TRS.entities[i].type === 'bubble' && checkCollision) {
+                  hit = TRS.collides(TRS.entities[i], 
+                                      {x: TRS.Input.x, y: TRS.Input.y, r: 7});
+                  if (hit) {
+                      // spawn an exposion
+                      for (var n = 0; n < 5; n +=1 ) {
+                          TRS.entities.push(new TRS.Particle(
+                              TRS.entities[i].x, 
+                              TRS.entities[i].y, 
+                              2, 
+                              // random opacity to spice it up a bit
+                              'rgba(255,255,255,'+Math.random()*1+')'
+                          )); 
+                      }
+                      TRS.score.collected += 1;
+                  }
+  
+                  TRS.entities[i].remove = hit;
+              }
+  
+              // delete from array if remove property
+              // flag is set to true
+              if (TRS.entities[i].remove) {
+                  TRS.entities.splice(i, 1);
+              }
+          }
+  
+          // update wave offset
+          // feel free to play with these values for either slower or faster waves
+          TRS.wave.time = new Date().getTime() * 0.002;
+          TRS.wave.offset = Math.sin(TRS.wave.time * 0.8) * 5;
+  
+          // calculate accuracy
+          TRS.score.accuracy = (TRS.score.hit / TRS.score.taps) * 100;
+          TRS.score.accuracy = isNaN(TRS.score.accuracy) ?
+              0 :
+              ~~(TRS.score.accuracy); // a handy way to round floats
+  
+      },
+  
+  
+      // this is where we draw all the entities
+      render: function() {
+  
+          var i;
+  
+  
+          TRS.Draw.rect(0, 0, TRS.WIDTH, TRS.HEIGHT, '#036');
+  
+          // display snazzy wave effect
+          for (i = 0; i < TRS.wave.total; i++) {
+  
+              TRS.Draw.circle(
+                          TRS.wave.x + TRS.wave.offset +  (i * TRS.wave.r), 
+                          TRS.wave.y,
+                          TRS.wave.r, 
+                          '#fff'); 
+          }
+  
+              // cycle through all entities and render to canvas
+              for (i = 0; i < TRS.entities.length; i += 1) {
+                  TRS.entities[i].render();
+          }
+  
+          // display scores
+          TRS.Draw.text('Collected: ' + TRS.score.collected, 20, 30, 14, '#fff');
+          TRS.Draw.text('Missed: ' + TRS.score.missed, 20, 50, 14, '#fff');
+          //TRS.Draw.text('Accuracy: ' + TRS.score.accuracy + '%', 20, 70, 14, '#fff');
+  
+      },
+  
+  
+      // the actual loop requests animation frame
+      // then proceeds to update and render
+      loop: function() {
+  
+          requestAnimFrame( TRS.loop );
+  
+          TRS.update();
+          TRS.render();
+      }
+  
+  
+  };
+  
+  // checks if two entties are touching
+  TRS.collides = function(a, b) {
+  
+          var distance_squared = ( ((a.x - b.x) * (a.x - b.x)) + 
+                                  ((a.y - b.y) * (a.y - b.y)));
+  
+          var radii_squared = (a.r + b.r) * (a.r + b.r);
+  
+          if (distance_squared < radii_squared) {
+              return true;
+          } else {
+              return false;
+          }
+  };
+  
+  
+  // abstracts various canvas operations into standalone functions
+  TRS.Draw = {
+  
+      clear: function() {
+          TRS.ctx.clearRect(0, 0, TRS.WIDTH, TRS.HEIGHT);
+      },
+  
+  
+      rect: function(x, y, w, h, col) {
+          TRS.ctx.fillStyle = col;
+          TRS.ctx.fillRect(x, y, w, h);
+      },
+  
+      circle: function(x, y, r, col) {
+          TRS.ctx.fillStyle = col;
+          TRS.ctx.beginPath();
+          TRS.ctx.arc(x + 5, y + 5, r, 0,  Math.PI * 2, true);
+          TRS.ctx.closePath();
+          TRS.ctx.fill();
+      },
+  
+  
+      text: function(string, x, y, size, col) {
+          TRS.ctx.font = 'bold '+size+'px Monospace';
+          TRS.ctx.fillStyle = col;
+          TRS.ctx.fillText(string, x, y);
+      }
+  
+  };
+  
+  
+  
+  TRS.Input = {
+  
+      x: 0,
+      y: 0,
+      tapped :false,
+  
+      set: function(data) {
+          this.x = (data.pageX - TRS.offset.left) / TRS.scale;
+          this.y = (data.pageY - TRS.offset.top) / TRS.scale;
+          this.tapped = true;
+  
+      }
+  
+  };
+  
+  TRS.Touch = function(x, y) {
+  
+      this.type = 'touch';    // we'll need this later
+      this.x = x;             // the x coordinate
+      this.y = y;             // the y coordinate
+      this.r = 5;             // the radius
+      this.opacity = 1;       // inital opacity. the dot will fade out
+      this.fade = 0.05;       // amount by which to fade on each game tick
+    // this.remove = false;   // flag for removing this entity. TRS.update will take care of this
+  
+      this.update = function() {
+          // reduct the opacity accordingly
+          this.opacity -= this.fade; 
+          // if opacity if 0 or less, flag for removal
+          this.remove = (this.opacity < 0) ? true : false;
+      };
+      //show touch point if needed
+      this.render = function() {
+          TRS.Draw.circle(this.x, this.y, this.r, 'rgba(255,0,0,'+this.opacity+')');
+      };
+  
+  };
+  
+  TRS.Bubble = function() {
+  
+      this.type = 'bubble';
+      this.r = (Math.random() * 20) + 10;
+      this.speed = (Math.random() * 3) + 1;
+   
+      this.x = (Math.random() * (TRS.WIDTH) - this.r);
+      this.y = TRS.HEIGHT + (Math.random() * 100) + 100;
+  
+      // the amount by which the bubble will move from side to side
+      this.waveSize = 5 + this.r;
+      // we need to remember the original x position for our sine wave calculation
+      this.xConstant = this.x;
+  
+      this.remove = false;
+  
+  
+      this.update = function() {
+  
+          // a sine wave is commonly a function of time
+          var time = new Date().getTime() * 0.002;
+  
+          this.y -= this.speed;
+          // the x coord to follow a sine wave
+          this.x = this.waveSize * Math.sin(time) + this.xConstant;
+  
+          // if offscreen flag for removal
+          if (this.y < -10) {
+              TRS.score.missed += 1; // update score
+              this.remove = true;
+          }
+  
+      };
+  
+      this.render = function() {
+  
+          TRS.Draw.circle(this.x, this.y, this.r, 'rgba(125,255,125,1)');
+      };
+  
+  };
+  
+  TRS.Particle = function(x, y,r, col) {
+  
+      this.x = x;
+      this.y = y;
+      this.r = r;
+      this.col = col;
+  
+      // determines whether particle will
+      // travel to the right of left
+      // 50% chance of either happening
+      this.dir = (Math.random() * 2 > 1) ? 1 : -1;
+  
+      // random values so particles do not travel at the same speeds
+      this.vx = ~~(Math.random() * 4) * this.dir;
+      this.vy = ~~(Math.random() * 7);
+  
+      this.remove = false;
+  
+      this.update = function() {
+  
+          // update coordinates
+          this.x += this.vx;
+          this.y += this.vy;
+  
+          // increase velocity so particle accelerates off screen
+          this.vx *= 0.99;
+          this.vy *= 0.99;
+  
+          // adding this negative amount to the
+          // y velocity exerts an upward pull on
+          // the particle, as if drawn to the surface
+          this.vy -= 0.25;
+  
+          // offscreen
+          if (this.y < 0) {
+              this.remove = true;
+          }
+  
+      };
+  
+  
+      this.render = function() {
+          TRS.Draw.circle(this.x, this.y, this.r, 'rgba(125,255,125,1)');
+      };
+  
+  };
+  
+  window.addEventListener('load', TRS.init, false);
+  window.addEventListener('resize', TRS.resize, false);
+</script>
+
+</body>
+
+</html>
 
 
