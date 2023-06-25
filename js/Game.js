@@ -348,14 +348,14 @@ export class Game extends THREE.Group {
           this.duckRig.ducksAmt = x;
           this.duckRig.reset();
       }),
-      new MyGuiVRButton('Geschwindigkeit der Enten', this.DUCK_BASE_SPEED, 1, 10, true, (x) => {
+      new MyGuiVRButton('Enten Geschw.', this.DUCK_BASE_SPEED, 1, 10, true, (x) => {
         this.duckRig.duckBaseSpeed = x / 200;
         this.duckRig.reset();
       }),
       new MyGuiVRButton('Projektil Radius', this.PROJ_RADIUS, 1, 5, true, (x) => {
           this.PROJ_RADIUS = x**2 / 100;
       }),
-      new MyGuiVRButton('Projektil Geschwindigkeit', this.PROJ_SPEED, 1, 5, true, (x) => {
+      new MyGuiVRButton('Projektil Geschw.', this.PROJ_SPEED, 1, 5, true, (x) => {
           this.PROJ_SPEED = 3 * x / 4;
       }),
       new MyGuiVRButton('Schussrate', this.PROJ_RATE_OF_FIRE, 1, 5, true, (x) => {
@@ -647,7 +647,7 @@ export class Game extends THREE.Group {
         text.translateZ(0.02);
         doorTipTextGroup.add(text);
 
-      geometry = new THREE.TextBufferGeometry('Willkommen!\nEs gibt 2 Menues - Links von dir: Start/Stoppe das Spiel\nRechts von dir: ändere die Spieleinstellungen\nZiel: treffe alle sich bewegenden Enten! \nMit dem rechten Controller wird geschossen und dein Score wird\nam Ende angezeigt.\nReminder: du kannst das Spiel jederzeit mit der Tuere hinter dir verlassen.', {
+      geometry = new THREE.TextBufferGeometry('Willkommen!\nEs gibt 2 Menues - Links von dir: Start/Stoppe das Spiel\nRechts von dir: aendere die Spieleinstellungen.\nZiel: treffe alle sich bewegenden Enten! \nMit dem rechten Controller wird geschossen\nund deine Zeit wird am Ende angezeigt.\nReminder: du kannst das Spiel jederzeit mit der Tuere hinter dir verlassen.', {
           font: font,
           size: 0.06,
           height: 0.001,
@@ -694,7 +694,7 @@ export class Game extends THREE.Group {
 
     let fontLoader = new THREE.FontLoader();
     fontLoader.load('extern/fonts/helvetiker_bold.typeface.json', (font) => {
-      let geometry = new THREE.TextBufferGeometry('Ergebnis: ' + this.score, {
+      let geometry = new THREE.TextBufferGeometry('Ergebnis in Sekunden: ' + this.score, {
           font: font,
           size: 0.06,
           height: 0.001,
