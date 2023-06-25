@@ -402,7 +402,7 @@ export class Game extends THREE.Group {
         this.setAnimation((dt) => {
           if (this.duckRig.ducks.length === 0) {
             let time = this.clock.getDelta();
-            this.score = (1000 / time).toFixed(0)
+            this.score = time.toFixed(0)
 
             this.playButton.val = 0;
             this.playButton.updateTexture();
