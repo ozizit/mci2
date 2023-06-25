@@ -647,7 +647,7 @@ export class Game extends THREE.Group {
         text.translateZ(0.02);
         doorTipTextGroup.add(text);
 
-      geometry = new THREE.TextBufferGeometry('Willkommen!\nEs gibt 2 Menues - Links von dir: Starten/Stoppe das Spiel\nRechts von dir: aendere die Spieleinstellungen.\nZiel: treffe alle sich bewegenden Enten! \nMit dem rechten Controller wird geschossen\nund deine Zeit wird am Ende angezeigt.\nReminder: du kannst das Spiel jederzeit mit der Tuere hinter dir verlassen.', {
+      geometry = new THREE.TextBufferGeometry('Willkommen!\nEs gibt 2 Menues - Links von dir: Starte/Stoppe das Spiel\nRechts von dir: aendere die Spieleinstellungen.\nZiel: treffe alle sich bewegenden Enten! \nMit dem rechten Controller wird geschossen\nund deine Zeit wird am Ende angezeigt.\nReminder: du kannst das Spiel jederzeit mit der Tuere hinter dir verlassen.', {
           font: font,
           size: 0.06,
           height: 0.001,
